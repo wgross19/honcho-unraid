@@ -1,15 +1,13 @@
-# Honcho config.toml — self-hosted with configurable LLM providers
+# Honcho config.toml — local Ollama (light) + Ollama Cloud (heavy)
 # Copy to: $APPDATA_ROOT/config/config.toml
 # Mounted read-only into the api container.
 #
-# PROVIDER STRATEGY (elkimek/honcho-self-hosted):
-#   Primary: "vllm" slot (any OpenAI-compatible API, default: OpenRouter)
-#   Backup:  "custom" slot (optional, kicks in on final retry)
-#
-# MODEL TIERS (chosen for function-calling reliability):
-#   Light:  z-ai/glm-4.7-flash  — 79.5% tau-bench, fast, cheap
-#   Medium: x-ai/grok-4.1-fast  — purpose-built for tool use, 2M context
-#   Heavy:  z-ai/glm-5          — 89.7% tau2-bench, best agentic scores
+# PROVIDER STRATEGY:
+#   "vllm"  = Local Ollama on Unraid tower (qwen3.5:4b)
+#             → used for: deriver, summary, dialectic minimal + low
+#   "custom" = Ollama Cloud subscription (llama4)
+#             → used for: dialectic medium + high + max, dream
+#   Embeddings = Local Ollama (embeddinggemma, 768d)
 
 [app]
 LOG_LEVEL = "INFO"
@@ -42,13 +40,10 @@ DEFAULT_TTL_SECONDS = 300
 # ---------------------------------------------------------------------------
 [llm]
 DEFAULT_MAX_TOKENS = 2500
-EMBEDDING_PROVIDER = "openrouter"
+EMBEDDING_PROVIDER = "ollama"
 
 # Embedding key, URL, and model are set via env vars (LLM_EMBEDDING_*)
-# If LLM_EMBEDDING_API_KEY is empty, falls back to LLM_OPENAI_COMPATIBLE_API_KEY.
-# If LLM_EMBEDDING_BASE_URL is empty, falls back to OPENAI_COMPATIBLE_BASE_URL below.
-
-OPENAI_COMPATIBLE_BASE_URL = "https://api.venice.ai/api/v1"
+OPENAI_COMPATIBLE_BASE_URL = "https://ollama.com/v1"
 
 # ---------------------------------------------------------------------------
 # Deriver — observation extraction (runs every message, needs speed + tools)
@@ -59,9 +54,7 @@ WORKERS = 1
 POLLING_SLEEP_INTERVAL_SECONDS = 1.0
 STALE_SESSION_TIMEOUT_MINUTES = 5
 PROVIDER = "vllm"
-MODEL = "z-ai/glm-4.7-flash"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "zai-org-glm-4.7-flash"
+MODEL = "qwen3.5:4b"
 DEDUPLICATE = true
 MAX_OUTPUT_TOKENS = 4096
 THINKING_BUDGET_TOKENS = 1
@@ -81,42 +74,32 @@ SESSION_HISTORY_MAX_TOKENS = 4096
 
 [dialectic.levels.minimal]
 PROVIDER = "vllm"
-MODEL = "z-ai/glm-4.7-flash"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "zai-org-glm-4.7-flash"
+MODEL = "qwen3.5:4b"
 THINKING_BUDGET_TOKENS = 1
 MAX_TOOL_ITERATIONS = 1
 MAX_OUTPUT_TOKENS = 250
 
 [dialectic.levels.low]
 PROVIDER = "vllm"
-MODEL = "z-ai/glm-4.7-flash"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "zai-org-glm-4.7-flash"
+MODEL = "qwen3.5:4b"
 THINKING_BUDGET_TOKENS = 1
 MAX_TOOL_ITERATIONS = 5
 
 [dialectic.levels.medium]
-PROVIDER = "vllm"
-MODEL = "x-ai/grok-4.1-fast"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "grok-41-fast"
+PROVIDER = "custom"
+MODEL = "llama4"
 THINKING_BUDGET_TOKENS = 1
 MAX_TOOL_ITERATIONS = 2
 
 [dialectic.levels.high]
-PROVIDER = "vllm"
-MODEL = "x-ai/grok-4.1-fast"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "grok-41-fast"
+PROVIDER = "custom"
+MODEL = "llama4"
 THINKING_BUDGET_TOKENS = 1
 MAX_TOOL_ITERATIONS = 4
 
 [dialectic.levels.max]
-PROVIDER = "vllm"
-MODEL = "z-ai/glm-5"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "zai-org-glm-5"
+PROVIDER = "custom"
+MODEL = "llama4"
 THINKING_BUDGET_TOKENS = 1
 MAX_TOOL_ITERATIONS = 10
 
@@ -128,9 +111,7 @@ ENABLED = true
 MESSAGES_PER_SHORT_SUMMARY = 20
 MESSAGES_PER_LONG_SUMMARY = 60
 PROVIDER = "vllm"
-MODEL = "z-ai/glm-4.7-flash"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "zai-org-glm-4.7-flash"
+MODEL = "qwen3.5:4b"
 MAX_TOKENS_SHORT = 1000
 MAX_TOKENS_LONG = 4000
 THINKING_BUDGET_TOKENS = 1
@@ -144,23 +125,22 @@ DOCUMENT_THRESHOLD = 50
 IDLE_TIMEOUT_MINUTES = 60
 MIN_HOURS_BETWEEN_DREAMS = 8
 ENABLED_TYPES = ["omni"]
-PROVIDER = "vllm"
-MODEL = "z-ai/glm-5"
-BACKUP_PROVIDER = "custom"
-BACKUP_MODEL = "zai-org-glm-5"
+PROVIDER = "custom"
+MODEL = "llama4"
 MAX_OUTPUT_TOKENS = 16384
 THINKING_BUDGET_TOKENS = 1
 MAX_TOOL_ITERATIONS = 20
 HISTORY_TOKEN_LIMIT = 16384
-DEDUCTION_MODEL = "x-ai/grok-4.1-fast"
-INDUCTION_MODEL = "x-ai/grok-4.1-fast"
+DEDUCTION_MODEL = "llama4"
+INDUCTION_MODEL = "llama4"
 
 [peer_card]
 ENABLED = true
 
+# embeddinggemma uses 768 dimensions — MUST match the model
 [vector_store]
 TYPE = "pgvector"
-DIMENSIONS = 1536
+DIMENSIONS = 768
 
 [metrics]
 ENABLED = false
