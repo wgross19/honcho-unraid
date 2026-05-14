@@ -14,7 +14,7 @@ bash prepare-on-unraid.sh
 
 # Edit .env with your keys:
 nano .env
-# Minimum: set LLM_VLLM_API_KEY and POSTGRES_PASSWORD
+# Minimum: set POSTGRES_PASSWORD and LLM_OPENAI_COMPATIBLE_API_KEY
 
 # Build and start:
 docker compose up -d --build
@@ -52,35 +52,32 @@ the cloud API.
 
 ## LLM Provider
 
-Honcho **requires** an LLM provider to start. There are two slots:
+Honcho **requires** tool-calling-capable LLMs. Runtime routing lives in
+`config/config.toml`; `.env` only stores credentials/placeholders.
 
-- **Primary** (`vllm`): any OpenAI-compatible endpoint. Default models in
-  `config.toml` point at OpenRouter: `z-ai/glm-4.7-flash` (light tasks),
-  `x-ai/grok-4.1-fast` (medium), `z-ai/glm-5` (heavy/dreams).
-- **Backup** (`custom`): optional fallback on final retry. Venice by default.
+Current routing:
 
-### Cloud API (recommended)
-
-Set in `.env`:
-```env
-LLM_VLLM_API_KEY=sk-or-...
-LLM_VLLM_BASE_URL=https://openrouter.ai/api/v1
-```
-
-### Local / LAN (Ollama, vLLM)
+- Deriver: local Ollama `qwen3.5:4b`, fallback Ollama Cloud `deepseek-v4-flash:cloud`
+- Summary: local Ollama `qwen3.5:4b`, fallback Ollama Cloud `deepseek-v4-flash:cloud`
+- Dialectic minimal: local Ollama `qwen3.5:4b`, fallback Ollama Cloud `deepseek-v4-flash:cloud`
+- Dialectic low: Ollama Cloud `deepseek-v4-flash:cloud` with `thinking_effort = "high"`, fallback local `qwen3.5:4b`
+- Dialectic medium: Ollama Cloud `deepseek-v4-flash:cloud` with `thinking_effort = "max"`, fallback local `qwen3.5:4b`
+- Dialectic high: Ollama Cloud `deepseek-v4-pro:cloud`, fallback local `qwen3.5:4b`
+- Dialectic max: Ollama Cloud `llama4`, fallback local `qwen3.5:4b`
+- Dream: Ollama Cloud `llama4`, fallback local `qwen3.5:4b`
+- Embeddings: local Ollama `embeddinggemma`, 768 dimensions
 
 Set in `.env`:
+
 ```env
 LLM_VLLM_API_KEY=none
-LLM_VLLM_BASE_URL=http://192.168.1.X:11434/v1
+LLM_EMBEDDING_API_KEY=none
+LLM_OPENAI_COMPATIBLE_API_KEY=sk-your-ollama-cloud-key
+LLM_OPENAI_API_KEY=none
 ```
 
-Then edit `config.toml`: replace all model names with your local models.
-Remove every `BACKUP_PROVIDER` and `BACKUP_MODEL` line.
-
-**Embeddings still need a cloud API** — local servers can't serve embedding models.
-Set `LLM_EMBEDDING_API_KEY` and `LLM_EMBEDDING_BASE_URL` to an OpenRouter or
-OpenAI key, or disable embeddings: set `EMBED_MESSAGES = false` in `config.toml`.
+If your local Ollama host is not `192.168.1.79`, edit the `base_url` values in
+`config/config.toml`.
 
 ## Resource Usage
 
@@ -90,8 +87,8 @@ OpenAI key, or disable embeddings: set `EMBED_MESSAGES = false` in `config.toml`
 | Redis | ~50 MB | Minimal (append-only log) |
 | Honcho API | ~300 MB idle | Image ~1 GB (Python + deps) |
 
-Plan for ~1 GB RAM baseline. Database grows with usage — embeddings are 1536-dim.
-Honcho's deriver processes messages incrementally, so it won't spike under load.
+Plan for ~1 GB RAM baseline. Database grows with usage — embeddings are 768-dim
+with the configured local `embeddinggemma` model.
 
 ## Backup
 
@@ -135,5 +132,5 @@ Import from: `/mnt/user/appdata/Compose/honcho/`
 | Database won't start | Permission issue: `chown -R 99:100 /mnt/user/appdata/Compose/honcho/postgres` |
 | Port conflict | Something else on 8000 — change `API_PORT` in `.env` |
 | Deriver not processing | `docker compose logs api` — look for "polling" or LLM errors |
-| LLM call failing | Verify `LLM_VLLM_API_KEY` + `LLM_VLLM_BASE_URL` in `.env` |
-| Embeddings not working | Verify `LLM_EMBEDDING_*` vars or disable with `EMBED_MESSAGES = false` |
+| LLM call failing | Verify `LLM_OPENAI_COMPATIBLE_API_KEY` in `.env` and model `base_url` values in `config/config.toml` |
+| Embeddings not working | Verify local Ollama is reachable and `LLM_EMBEDDING_API_KEY=none` is set |
