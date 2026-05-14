@@ -1,0 +1,88 @@
+# Honcho — Unraid Compose Manager
+# Self-hosted memory layer for Hermes Agent
+#
+# Architecture:
+#   api (FastAPI + in-process deriver) ← depends_on → database (pgvector) + redis
+#
+# Usage:
+#   cp .env.example .env       # edit your keys
+#   bash prepare-on-unraid.sh  # clone upstream + apply configs
+#   docker compose up -d --build
+
+networks:
+  honcho-internal:
+    driver: bridge
+    name: honcho-internal
+
+services:
+  database:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    networks:
+      - honcho-internal
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-honcho}
+      - POSTGRES_USER=${POSTGRES_USER:-honcho}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ${APPDATA_ROOT:-/mnt/user/appdata/Compose/honcho}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-honcho} -d ${POSTGRES_DB:-honcho}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  redis:
+    image: redis:8.2
+    restart: unless-stopped
+    networks:
+      - honcho-internal
+    volumes:
+      - ${APPDATA_ROOT:-/mnt/user/appdata/Compose/honcho}/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  api:
+    build:
+      context: ${APPDATA_ROOT:-/mnt/user/appdata/Compose/honcho}/upstream
+      dockerfile: Dockerfile
+    image: honcho:local
+    entrypoint: ["sh", "docker/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - honcho-internal
+    ports:
+      - "${API_HOST:-0.0.0.0}:${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - DB_CONNECTION_URI=postgresql+psycopg://${POSTGRES_USER:-honcho}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-honcho}
+      - CACHE_URL=redis://redis:6379/0?suppress=true
+      - CACHE_ENABLED=true
+      - METRICS_ENABLED=false
+    volumes:
+      - ${APPDATA_ROOT:-/mnt/user/appdata/Compose/honcho}/config/config.toml:/app/config.toml:ro
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
