@@ -40,6 +40,9 @@ services:
     cap_add:
       - CHOWN
       - FOWNER
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
 
   redis:
     image: redis:8.2
