@@ -5,7 +5,7 @@
 # PROVIDER STRATEGY:
 #   Local Ollama on Unraid tower: qwen3.5:4b for hot-path/light work
 #   Ollama Cloud subscription: DeepSeek V4 for dialectic reasoning tiers
-#   Embeddings: local Ollama qwen3-embedding:4b, 1536 dimensions
+#   Embeddings: local Ollama embeddinggemma, 768 dimensions
 
 [app]
 LOG_LEVEL = "INFO"
@@ -46,20 +46,21 @@ MAX_MESSAGE_CONTENT_CHARS = 2000
 # expect it to exist; runtime model configs below use explicit api_key_env values.
 
 # ---------------------------------------------------------------------------
-# Embeddings — local Ollama qwen3-embedding:4b, 1536 dimensions
+# Embeddings — local Ollama embeddinggemma, 768 dimensions
 # ---------------------------------------------------------------------------
 [embedding]
-VECTOR_DIMENSIONS = 1536
+VECTOR_DIMENSIONS = 768
 MAX_INPUT_TOKENS = 8192
 MAX_TOKENS_PER_REQUEST = 300000
 
 [embedding.model_config]
 transport = "openai"
-model = "qwen3-embedding:4b"
+model = "embeddinggemma"
+dimensions_mode = "never"
 
 [embedding.model_config.overrides]
 base_url = "http://192.168.1.79:11434/v1"
-api_key_env = "LLM_VLLM_API_KEY"
+api_key_env = "LLM_EMBEDDING_API_KEY"
 
 # ---------------------------------------------------------------------------
 # Deriver — observation extraction (runs every message, needs speed + tools)
